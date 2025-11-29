@@ -1,19 +1,22 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDu-mtqAJQYLLi5T1QBxL3BiTnsxpXZlko",
-  authDomain: "pastasvicenzo.firebaseapp.com",
-  projectId: "pastasvicenzo",
-  storageBucket: "pastasvicenzo.firebasestorage.app",
-  messagingSenderId: "772204708211",
-  appId: "1:772204708211:web:64db7bb1cf80298251c506",
-  measurementId: "G-F0STK1VZQB"
+  apiKey: "AIzaSyC9zUkdQULNoe-G2KR97xdUDpdWAnUARe0",
+  authDomain: "pastavicenzo.firebaseapp.com",
+  projectId: "pastavicenzo",
+  storageBucket: "pastavicenzo.firebasestorage.app",
+  messagingSenderId: "575935344286",
+  appId: "1:575935344286:web:8b7fceca33be909a76958f",
+  measurementId: "G-18L2TJMBCN"
 };
 
 // Initialize Firebase
-// Use getApp/getApps to avoid initializing twice in hot-reload environments or SSR
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const auth = getAuth(app);
+const db = getFirestore(app);
 
 // Initialize Analytics only on client side
 let analytics;
@@ -25,5 +28,4 @@ if (typeof window !== 'undefined') {
   });
 }
 
-export { app, analytics };
-
+export { app, analytics, auth, db };
