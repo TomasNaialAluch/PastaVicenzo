@@ -1,0 +1,36 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Reglas para imágenes de productos
+    match /products/{productId} {
+      // Solo usuarios autenticados pueden subir imágenes de productos
+      // Nota: La verificación de rol admin se hace en el código de la aplicación
+      // Las reglas de Storage no pueden acceder directamente a Firestore
+      allow write: if request.auth != null && 
+                      request.resource.size < 5 * 1024 * 1024 && // Máximo 5MB
+                      request.resource.contentType.matches('image/.*'); // Solo imágenes
+      
+      // Cualquiera puede leer las imágenes de productos (para mostrar en la tienda)
+      allow read: if true;
+    }
+    
+    // Reglas para imágenes de configuración (hero, logo, etc.)
+    match /config/{fileName} {
+      // Solo usuarios autenticados pueden subir imágenes de configuración
+      // Nota: La verificación de rol admin se hace en el código de la aplicación
+      allow write: if request.auth != null && 
+                      request.resource.size < 5 * 1024 * 1024 && // Máximo 5MB
+                      request.resource.contentType.matches('image/.*'); // Solo imágenes
+      
+      // Cualquiera puede leer las imágenes de configuración (para mostrar en el sitio)
+      allow read: if true;
+    }
+    
+    // Reglas por defecto: bloquear todo lo demás
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

@@ -48,21 +48,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (userSnap.exists()) {
             // Usuario ya existe, cargar datos pero asegurar que email y displayName vengan de Firebase Auth
             const firestoreData = userSnap.data()
+            
+            // Validación TypeScript: asegurar que role sea válido ('user' | 'admin')
+            const validRole: 'user' | 'admin' = 
+              firestoreData.role === 'admin' || firestoreData.role === 'user' 
+                ? firestoreData.role 
+                : 'user' // Valor por defecto si el role no es válido
+            
             const updatedUser: UserProfile = {
               ...firestoreData,
               uid: firebaseUser.uid,
-              email: firebaseUser.email || firestoreData.email, // Priorizar Firebase Auth
-              displayName: firebaseUser.displayName || firestoreData.displayName, // Priorizar Firebase Auth
-              photoURL: firebaseUser.photoURL || firestoreData.photoURL,
-            } as UserProfile
+              email: firebaseUser.email || firestoreData.email || null, // Priorizar Firebase Auth
+              displayName: firebaseUser.displayName || firestoreData.displayName || null, // Priorizar Firebase Auth
+              photoURL: firebaseUser.photoURL || firestoreData.photoURL || null,
+              role: validRole, // Asegurar que siempre tenga un role válido
+            }
             
-            // Si los datos de Firebase Auth son diferentes, actualizar Firestore
-            if (firebaseUser.email !== firestoreData.email || firebaseUser.displayName !== firestoreData.displayName) {
+            // Si los datos de Firebase Auth son diferentes o falta el role, actualizar Firestore
+            if (
+              firebaseUser.email !== firestoreData.email || 
+              firebaseUser.displayName !== firestoreData.displayName ||
+              !firestoreData.role ||
+              (firestoreData.role !== 'user' && firestoreData.role !== 'admin')
+            ) {
               await setDoc(userRef, {
                 ...firestoreData,
                 email: firebaseUser.email,
                 displayName: firebaseUser.displayName,
                 photoURL: firebaseUser.photoURL,
+                role: validRole, // Asegurar que el role esté guardado correctamente
               }, { merge: true })
             }
             

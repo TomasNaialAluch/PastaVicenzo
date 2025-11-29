@@ -2,10 +2,12 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC9zUkdQULNoe-G2KR97xdUDpdWAnUARe0",
   authDomain: "pastavicenzo.firebaseapp.com",
+  databaseURL: "https://pastavicenzo-default-rtdb.firebaseio.com",
   projectId: "pastavicenzo",
   storageBucket: "pastavicenzo.firebasestorage.app",
   messagingSenderId: "575935344286",
@@ -17,6 +19,7 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 // Initialize Analytics only on client side
 let analytics;
@@ -28,4 +31,4 @@ if (typeof window !== 'undefined') {
   });
 }
 
-export { app, analytics, auth, db };
+export { app, analytics, auth, db, storage };

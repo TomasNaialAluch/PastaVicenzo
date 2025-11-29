@@ -14,7 +14,7 @@ import Link from "next/link"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/lib/auth-context"
 import { LoginView } from "@/components/auth/login-view"
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
+import { collection, query, getDocs, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 // Tipo para pedidos
@@ -35,6 +35,75 @@ export default function MiCuentaPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all")
   const [orders, setOrders] = useState<Order[]>([])
   const [ordersLoading, setOrdersLoading] = useState(true)
+
+  // Cargar pedidos desde Firestore - DEBE estar antes de cualquier retorno condicional
+  useEffect(() => {
+    if (!user?.uid) {
+      setOrders([])
+      setOrdersLoading(false)
+      return
+    }
+
+    const loadOrders = async () => {
+      try {
+        setOrdersLoading(true)
+        console.log("🔍 Buscando pedidos para userId:", user.uid)
+        // Usar subcolección: users/{userId}/orders
+        const ordersRef = collection(db, "users", user.uid, "orders")
+        
+        // Con subcolección, podemos usar orderBy directamente sin necesidad de índice compuesto
+        let querySnapshot
+        let needsClientSort = false
+        try {
+          const q = query(
+            ordersRef,
+            orderBy("createdAt", "desc")
+          )
+          querySnapshot = await getDocs(q)
+        } catch (orderByError: any) {
+          // Si falla por algún motivo, intentar sin orderBy y ordenar en el cliente
+          console.warn("⚠️ No se pudo ordenar en la query, ordenando en el cliente...")
+          querySnapshot = await getDocs(ordersRef)
+          needsClientSort = true
+        }
+        
+        console.log("📦 Pedidos encontrados:", querySnapshot.size)
+        const ordersData: Order[] = []
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          console.log("📄 Pedido:", doc.id, data)
+          ordersData.push({
+            id: doc.id,
+            date: data.createdAt?.toDate?.()?.toISOString() || data.date || new Date().toISOString(),
+            status: data.status || "preparacion",
+            total: data.total || 0,
+            items: data.items || [],
+            itemCount: data.items?.length || 0
+          })
+        })
+        
+        // Si no usamos orderBy en la query, ordenar en el cliente
+        if (needsClientSort && ordersData.length > 0) {
+          ordersData.sort((a, b) => {
+            const dateA = new Date(a.date).getTime()
+            const dateB = new Date(b.date).getTime()
+            return dateB - dateA // Descendente (más reciente primero)
+          })
+        }
+        
+        setOrders(ordersData)
+        console.log("✅ Pedidos cargados:", ordersData.length)
+      } catch (error: any) {
+        console.error("❌ Error cargando pedidos:", error)
+        // En cualquier caso, establecer array vacío para que la UI muestre el estado correcto
+        setOrders([])
+      } finally {
+        setOrdersLoading(false)
+      }
+    }
+
+    loadOrders()
+  }, [user?.uid])
 
   if (loading) {
     return (
@@ -89,52 +158,6 @@ export default function MiCuentaPage() {
   const lastName = nameParts.slice(1).join(" ")
   const userPhone = user.phone ?? ""
   const userAddress = (user as any)?.address ?? ""
-
-  // Cargar pedidos desde Firestore
-  useEffect(() => {
-    if (!user?.uid) {
-      setOrders([])
-      setOrdersLoading(false)
-      return
-    }
-
-    const loadOrders = async () => {
-      try {
-        setOrdersLoading(true)
-        console.log("🔍 Buscando pedidos para userId:", user.uid)
-        const ordersRef = collection(db, "orders")
-        const q = query(
-          ordersRef,
-          where("userId", "==", user.uid),
-          orderBy("createdAt", "desc")
-        )
-        const querySnapshot = await getDocs(q)
-        console.log("📦 Pedidos encontrados:", querySnapshot.size)
-        const ordersData: Order[] = []
-        querySnapshot.forEach((doc) => {
-          const data = doc.data()
-          console.log("📄 Pedido:", doc.id, data)
-          ordersData.push({
-            id: doc.id,
-            date: data.createdAt?.toDate?.()?.toISOString() || data.date || new Date().toISOString(),
-            status: data.status || "preparacion",
-            total: data.total || 0,
-            items: data.items || [],
-            itemCount: data.items?.length || 0
-          })
-        })
-        setOrders(ordersData)
-        console.log("✅ Pedidos cargados:", ordersData.length)
-      } catch (error) {
-        console.error("❌ Error cargando pedidos:", error)
-        setOrders([])
-      } finally {
-        setOrdersLoading(false)
-      }
-    }
-
-    loadOrders()
-  }, [user?.uid])
 
   const getStatusBadge = (status: OrderStatus) => {
     switch (status) {

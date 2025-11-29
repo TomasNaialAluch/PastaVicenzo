@@ -3,15 +3,17 @@
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { Menu, Search, Heart, ShoppingCart, User, Home, Store, Phone, LogOut } from "lucide-react"
+import { Menu, ShoppingCart, User, Home, Store, Phone, LogOut, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader, SheetFooter } from "@/components/ui/sheet"
 import { Separator } from "@/components/ui/separator"
 import { CartSheet } from "@/components/cart-sheet"
+import { useIsAdmin } from "@/lib/use-is-admin"
 
 export function Header() {
   const [isOpen, setIsOpen] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
+  const { isAdmin } = useIsAdmin()
 
   useEffect(() => {
     setIsMounted(true)
@@ -40,30 +42,28 @@ export function Header() {
             <Link href="/#contacto" className="text-sm font-medium hover:text-primary transition-colors">
               Contacto
             </Link>
+            <Link href="/mi-cuenta" className="text-sm font-medium hover:text-primary transition-colors">
+              Mi Cuenta
+            </Link>
+            {isAdmin && (
+              <Link 
+                href="/admin/pedidos" 
+                className="text-sm font-medium text-primary hover:text-primary/80 transition-colors font-semibold flex items-center gap-1"
+              >
+                <Settings className="h-4 w-4" />
+                Admin
+              </Link>
+            )}
           </nav>
 
           {/* Actions */}
           <div className="flex items-center gap-2 md:gap-3">
-            <Button variant="ghost" size="icon" className="hidden md:inline-flex">
-              <Search className="h-5 w-5" />
-              <span className="sr-only">Buscar</span>
-            </Button>
-            <Button variant="ghost" size="icon" className="hidden md:inline-flex">
-              <Heart className="h-5 w-5" />
-              <span className="sr-only">Favoritos</span>
-            </Button>
-            
             {isMounted ? <CartSheet /> : (
               <Button variant="ghost" size="icon" className="relative">
                 <ShoppingCart className="h-5 w-5" />
                 <span className="sr-only">Carrito</span>
               </Button>
             )}
-
-            <Button variant="ghost" size="icon" className="hidden md:inline-flex">
-              <User className="h-5 w-5" />
-              <span className="sr-only">Perfil</span>
-            </Button>
 
             {/* Mobile Menu */}
             {isMounted ? (
@@ -120,6 +120,17 @@ export function Header() {
                       <User className="h-5 w-5" />
                       Mi Cuenta
                     </Link>
+                    
+                    {isAdmin && (
+                      <Link
+                        href="/admin/pedidos"
+                        className="flex items-center gap-4 px-2 py-3 text-lg font-medium text-primary hover:bg-primary/5 rounded-md transition-all font-semibold"
+                        onClick={() => setIsOpen(false)}
+                      >
+                        <Settings className="h-5 w-5" />
+                        Panel Admin
+                      </Link>
+                    )}
                   </nav>
 
                   <SheetFooter className="border-t pt-4 sm:flex-col sm:items-start">

@@ -22,6 +22,46 @@ export default function DireccionesPage() {
   const [addressesLoading, setAddressesLoading] = useState(true)
   const { openModal } = useConfirmModal()
 
+  // Cargar direcciones desde Firestore - DEBE estar antes de cualquier retorno condicional
+  useEffect(() => {
+    if (!user?.uid) {
+      setAddresses([])
+      setAddressesLoading(false)
+      return
+    }
+
+    const loadAddresses = async () => {
+      try {
+        setAddressesLoading(true)
+        // Usar subcolección: users/{userId}/addresses
+        const addressesRef = collection(db, "users", user.uid, "addresses")
+        const querySnapshot = await getDocs(addressesRef)
+        const addressesData: Address[] = []
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          addressesData.push({
+            id: doc.id,
+            name: data.name || "",
+            type: data.type || "other",
+            street: data.street || "",
+            city: data.city || "",
+            zipCode: data.zipCode || "",
+            notes: data.notes || "",
+            isDefault: data.isDefault || false,
+          })
+        })
+        setAddresses(addressesData)
+      } catch (error) {
+        console.error("Error cargando direcciones:", error)
+        setAddresses([])
+      } finally {
+        setAddressesLoading(false)
+      }
+    }
+
+    loadAddresses()
+  }, [user?.uid])
+
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col">
@@ -49,46 +89,6 @@ export default function DireccionesPage() {
   const displayName = user.displayName || user.email?.split("@")[0] || "Tu cuenta"
   const userEmail = user.email || "Sin email"
 
-  // Cargar direcciones desde Firestore
-  useEffect(() => {
-    if (!user?.uid) {
-      setAddresses([])
-      setAddressesLoading(false)
-      return
-    }
-
-    const loadAddresses = async () => {
-      try {
-        setAddressesLoading(true)
-        const addressesRef = collection(db, "addresses")
-        const q = query(addressesRef, where("userId", "==", user.uid))
-        const querySnapshot = await getDocs(q)
-        const addressesData: Address[] = []
-        querySnapshot.forEach((doc) => {
-          const data = doc.data()
-          addressesData.push({
-            id: doc.id,
-            name: data.name || "",
-            type: data.type || "other",
-            street: data.street || "",
-            city: data.city || "",
-            zipCode: data.zipCode || "",
-            notes: data.notes || "",
-            isDefault: data.isDefault || false,
-          })
-        })
-        setAddresses(addressesData)
-      } catch (error) {
-        console.error("Error cargando direcciones:", error)
-        setAddresses([])
-      } finally {
-        setAddressesLoading(false)
-      }
-    }
-
-    loadAddresses()
-  }, [user?.uid])
-
   const handleOpenDialog = (address?: Address) => {
     setEditingAddress(address || null)
     setIsDialogOpen(true)
@@ -99,8 +99,8 @@ export default function DireccionesPage() {
 
     try {
       if (editingAddress) {
-        // Edit en Firestore
-        const addressRef = doc(db, "addresses", address.id)
+        // Edit en Firestore - usar subcolección
+        const addressRef = doc(db, "users", user.uid, "addresses", address.id)
         await updateDoc(addressRef, {
           name: address.name,
           type: address.type,
@@ -112,9 +112,8 @@ export default function DireccionesPage() {
         })
         setAddresses(addresses.map((addr) => (addr.id === address.id ? address : addr)))
       } else {
-        // Create en Firestore
-        const newAddressRef = await addDoc(collection(db, "addresses"), {
-          userId: user.uid,
+        // Create en Firestore - usar subcolección (ya no necesitamos userId en el documento)
+        const newAddressRef = await addDoc(collection(db, "users", user.uid, "addresses"), {
           name: address.name,
           type: address.type,
           street: address.street,
@@ -132,13 +131,15 @@ export default function DireccionesPage() {
   }
 
   const handleDelete = (id: string) => {
+    if (!user?.uid) return
+    
     openModal({
       title: "¿Eliminar dirección?",
       description: "Esta acción no se puede deshacer. ¿Estás seguro de que querés eliminar esta dirección?",
       actionLabel: "Sí, eliminar",
       onConfirm: async () => {
         try {
-          await deleteDoc(doc(db, "addresses", id))
+          await deleteDoc(doc(db, "users", user.uid, "addresses", id))
           setAddresses(addresses.filter((addr) => addr.id !== id))
         } catch (error) {
           console.error("Error eliminando dirección:", error)
@@ -153,7 +154,7 @@ export default function DireccionesPage() {
     try {
       // Primero quitar el default de todas las direcciones
       const updates = addresses.map(async (addr) => {
-        const addressRef = doc(db, "addresses", addr.id)
+        const addressRef = doc(db, "users", user.uid, "addresses", addr.id)
         await updateDoc(addressRef, {
           isDefault: addr.id === id,
         })

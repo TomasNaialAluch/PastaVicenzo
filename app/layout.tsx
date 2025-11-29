@@ -1,10 +1,10 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Playfair_Display, Inter } from "next/font/google"
+import { Bodoni_Moda, Inter } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 
-const playfair = Playfair_Display({
+const bodoni = Bodoni_Moda({
   subsets: ["latin"],
   variable: "--font-serif",
   display: "swap",
@@ -23,6 +23,8 @@ export const metadata: Metadata = {
 }
 
 import { CartProvider } from "@/lib/cart-context"
+import { AuthProvider } from "@/lib/auth-context"
+import { ConfirmModalProvider } from "@/components/ui/global-confirmation-modal"
 
 export default function RootLayout({
   children,
@@ -30,11 +32,15 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="es" className={`${inter.variable} ${playfair.variable}`}>
+    <html lang="es" className={`${inter.variable} ${bodoni.variable}`}>
       <body className="font-sans antialiased">
-        <CartProvider>
-          {children}
-        </CartProvider>
+        <AuthProvider>
+          <ConfirmModalProvider>
+            <CartProvider>
+              {children}
+            </CartProvider>
+          </ConfirmModalProvider>
+        </AuthProvider>
         <Analytics />
       </body>
     </html>

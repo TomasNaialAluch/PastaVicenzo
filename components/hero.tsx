@@ -1,9 +1,41 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { MessageCircle } from "lucide-react"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 export function Hero() {
+  const [heroImage, setHeroImage] = useState<string>("/images/hero-pasta.jpg")
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const loadHeroImage = async () => {
+      try {
+        setIsLoading(true)
+        const configRef = doc(db, "config", "site")
+        const configSnap = await getDoc(configRef)
+        
+        if (configSnap.exists()) {
+          const data = configSnap.data()
+          if (data.heroImage && data.heroImage.trim() !== "") {
+            setHeroImage(data.heroImage)
+          }
+        }
+      } catch (error) {
+        console.error("Error cargando imagen del hero:", error)
+        // Mantener imagen por defecto si hay error
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadHeroImage()
+  }, [])
+
   return (
     <section className="relative overflow-hidden bg-secondary">
       <div className="container mx-auto px-4 py-12 md:py-20 lg:py-24">
@@ -30,14 +62,25 @@ export function Hero() {
           </div>
 
           {/* Image */}
-          <div className="relative aspect-square lg:aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl">
-            <Image
-              src="/images/hero-pasta.jpg"
-              alt="Pastas artesanales frescas"
-              fill
-              className="object-cover"
-              priority
-            />
+          <div className="relative aspect-square lg:aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl bg-muted">
+            {isLoading ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="animate-pulse text-muted-foreground">Cargando...</div>
+              </div>
+            ) : (
+              <Image
+                src={heroImage}
+                alt="Pastas artesanales frescas"
+                fill
+                className="object-cover"
+                priority
+                unoptimized={heroImage.startsWith('http') || heroImage.startsWith('https')} // Desactivar optimización para URLs externas de Firebase Storage
+                onError={() => {
+                  // Fallback a imagen por defecto si falla
+                  setHeroImage("/images/hero-pasta.jpg")
+                }}
+              />
+            )}
           </div>
         </div>
       </div>

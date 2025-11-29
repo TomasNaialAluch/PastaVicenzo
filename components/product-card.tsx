@@ -15,24 +15,38 @@ interface ProductCardProps {
   description: string
   price: number
   image: string
+  category?: string
   isPromo?: boolean
   isVeggie?: boolean
   isGlutenFree?: boolean
+  unitsPerPackage?: number
+  servesPeople?: number
+  variants?: { id: string; label: string; price: number }[]
 }
 
-export function ProductCard({ id, name, description, price, image, isPromo, isVeggie, isGlutenFree }: ProductCardProps) {
+export function ProductCard({ id, name, description, price, image, category, isPromo, isVeggie, isGlutenFree, unitsPerPackage, servesPeople, variants }: ProductCardProps) {
   const [quantity, setQuantity] = useState(1)
+  const [selectedVariantId, setSelectedVariantId] = useState<string>(variants && variants.length > 0 ? variants[0].id : "")
   const [isFavorite, setIsFavorite] = useState(false)
   const [isAdding, setIsAdding] = useState(false)
   const { addItem } = useCart()
 
+  const currentPrice = variants && variants.length > 0 && selectedVariantId
+    ? variants.find(v => v.id === selectedVariantId)?.price || price
+    : price
+
   const handleAddToCart = () => {
     setIsAdding(true)
     
+    const variant = variants?.find(v => v.id === selectedVariantId)
+    const finalId = variant ? `${id}-${variant.id}` : id
+    const finalName = variant ? `${name} (${variant.label})` : name
+    const finalPrice = variant ? variant.price : price
+
     // Simular pequeña demora para la animación
     setTimeout(() => {
       for (let i = 0; i < quantity; i++) {
-        addItem({ id, name, price, image })
+        addItem({ id: finalId, name: finalName, price: finalPrice, image })
       }
       
       toast.custom((t) => (
@@ -43,7 +57,7 @@ export function ProductCard({ id, name, description, price, image, isPromo, isVe
           <div className="flex-1">
             <h4 className="font-serif font-bold text-primary">¡Agregado al carrito!</h4>
             <p className="text-sm text-muted-foreground">
-              Has agregado <span className="font-semibold text-foreground">{quantity}x {name}</span>
+              Has agregado <span className="font-semibold text-foreground">{quantity}x {finalName}</span>
             </p>
           </div>
         </div>
@@ -89,9 +103,48 @@ export function ProductCard({ id, name, description, price, image, isPromo, isVe
         </div>
       </div>
       <CardContent className="p-4">
-        <h3 className="font-serif text-xl font-bold text-primary mb-2">{name}</h3>
+        <h3 className="font-serif text-xl font-bold text-primary mb-2 drop-shadow-sm">{name}</h3>
         <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">{description}</p>
-        <p className="text-2xl font-bold text-primary mt-3">${price.toFixed(2)}</p>
+        {category === "rellenas" && unitsPerPackage && (
+          <p className="text-sm text-muted-foreground mt-2 font-medium">
+            {unitsPerPackage} unidades por paquete
+          </p>
+        )}
+        
+        {/* Selector de Variantes */}
+        {variants && variants.length > 0 && (
+          <div className="mt-4">
+            <p className="text-sm font-semibold mb-2">Elegí una opción:</p>
+            <div className="grid grid-cols-1 gap-3">
+              {variants.map((variant) => (
+                <Button
+                  key={variant.id}
+                  variant={selectedVariantId === variant.id ? "default" : "outline"}
+                  size="lg"
+                  className={`justify-between h-12 px-4 ${
+                    selectedVariantId === variant.id 
+                      ? "bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20" 
+                      : "hover:bg-primary/5 hover:border-primary/50 border-muted-foreground/30"
+                  }`}
+                  onClick={() => setSelectedVariantId(variant.id)}
+                >
+                  <span className="text-sm font-medium">{variant.label}</span>
+                  <span className={`text-base font-bold ${
+                    selectedVariantId === variant.id ? "text-primary-foreground" : "text-primary"
+                  }`}>
+                    ${variant.price.toLocaleString('es-AR')}
+                  </span>
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!variants?.length && (
+          <p className="text-2xl font-bold text-primary mt-3">
+            ${typeof currentPrice === 'number' ? currentPrice.toLocaleString('es-AR') : currentPrice}
+          </p>
+        )}
       </CardContent>
       <CardFooter className="p-4 pt-0 flex gap-2">
         <div className="flex items-center border rounded-lg">

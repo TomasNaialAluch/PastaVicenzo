@@ -3,26 +3,74 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // Función helper para verificar que el usuario es el dueño
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Función helper para verificar si el usuario es admin
+    // Maneja casos donde el documento no existe o no tiene el campo role
+    function isAdmin() {
+      return request.auth != null && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
     // Reglas para la colección de usuarios
     match /users/{userId} {
-      // Permitir leer y escribir solo si el usuario está autenticado y es dueño del documento
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Permitir leer si el usuario es el dueño o es admin
+      allow read: if isOwner(userId) || isAdmin();
+      // Permitir escribir solo si el usuario es el dueño
+      allow write: if isOwner(userId);
+      
+      // Reglas para subcolección de direcciones
+      match /addresses/{addressId} {
+        // Permitir leer y escribir solo si el usuario es el dueño
+        allow read, write: if isOwner(userId);
+      }
+      
+             // Reglas para subcolección de pedidos
+             match /orders/{orderId} {
+               // Permitir leer si el usuario es el dueño o es admin
+               allow read: if isOwner(userId) || isAdmin();
+               // Permitir escribir solo si el usuario es el dueño
+               allow write: if isOwner(userId);
+               // Permitir actualizar estado si es admin
+               allow update: if isOwner(userId) || isAdmin();
+             }
+
+             // Reglas para subcolección de carrito
+             match /cart/{cartId} {
+               allow read, write: if isOwner(userId);
+             }
+           }
+    
+    // Reglas para pedidos de invitados (guest checkout)
+    match /guest_orders/{orderId} {
+      // Cualquiera puede crear un pedido (incluso sin autenticarse)
+      allow create: if true;
+      // Solo admins pueden leer y actualizar pedidos de invitados
+      allow read, update: if isAdmin();
+      // Nadie puede eliminar pedidos (solo admins podrían hacerlo manualmente desde la consola si es necesario)
+      allow delete: if false;
     }
     
-    // Reglas para la colección de pedidos
-    match /orders/{orderId} {
-      // Permitir leer y escribir solo si el usuario está autenticado y es dueño del pedido
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      // Permitir crear pedidos si el usuario está autenticado y el userId coincide
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    // Reglas para productos
+    match /products/{productId} {
+      // Cualquiera puede leer productos (el filtrado de activos se hace en el código del cliente)
+      // Nota: Permitimos lectura pública porque las queries de colección no pueden usar resource.data
+      // El código del cliente filtra productos inactivos antes de mostrarlos
+      allow read: if true;
+      // Solo admins pueden crear, actualizar y eliminar productos
+      allow create, update, delete: if isAdmin();
     }
     
-    // Reglas para la colección de direcciones
-    match /addresses/{addressId} {
-      // Permitir leer y escribir solo si el usuario está autenticado y es dueño de la dirección
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      // Permitir crear direcciones si el usuario está autenticado y el userId coincide
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    // Reglas para configuración del sitio
+    match /config/{document=**} {
+      // Cualquiera puede leer la configuración
+      allow read: if true;
+      // Solo admins pueden escribir
+      allow write: if isAdmin();
     }
     
     // Reglas por defecto (bloquear todo lo demás por seguridad)

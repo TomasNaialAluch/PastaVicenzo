@@ -1,70 +1,78 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ProductCard } from "./product-card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { collection, getDocs, query, orderBy } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
-const products = [
-  {
-    id: "1",
-    name: "Ravioles de Ricota",
-    description:
-      "Ravioles artesanales rellenos de ricota fresca y espinaca, perfectos para acompañar con tu salsa favorita.",
-    price: 1200,
-    image: "/images/ravioli.jpg",
-    category: "rellenas",
-    isVeggie: true,
-  },
-  {
-    id: "2",
-    name: "Fettuccine Casero",
-    description: "Cintas de pasta fresca hechas con huevos de campo. Textura perfecta para salsas cremosas.",
-    price: 900,
-    image: "/images/fettuccine.jpg",
-    category: "cintas",
-  },
-  {
-    id: "3",
-    name: "Ñoquis de Papa",
-    description: "Ñoquis tradicionales hechos con papas seleccionadas. Suaves y esponjosos, listos para cocinar.",
-    price: 850,
-    image: "/images/gnocchi.jpg",
-    category: "especiales",
-    isGlutenFree: false,
-  },
-  {
-    id: "4",
-    name: "Lasagna Fresca",
-    description: "Placas de lasagna artesanales, ideales para armar tu lasagna casera con capas perfectas.",
-    price: 950,
-    image: "/images/lasagna.jpg",
-    category: "placas",
-  },
-  {
-    id: "5",
-    name: "Ravioles de Verdura",
-    description: "Ravioles rellenos de verduras de estación. Opción saludable y deliciosa.",
-    price: 1150,
-    image: "/images/ravioli.jpg",
-    category: "rellenas",
-    isVeggie: true,
-    isPromo: true,
-  },
-  {
-    id: "6",
-    name: "Tallarines Caseros",
-    description: "Tallarines tradicionales hechos con la receta de la nonna. Perfectos para cualquier salsa.",
-    price: 800,
-    image: "/images/fettuccine.jpg",
-    category: "cintas",
-  },
-]
+interface Product {
+  id: string
+  name: string
+  description: string
+  price: number
+  image: string
+  category: string
+  isVeggie?: boolean
+  isGlutenFree?: boolean
+  isPromo?: boolean
+  isActive?: boolean
+  unitsPerPackage?: number
+  servesPeople?: number
+  variants?: { id: string; label: string; price: number }[]
+}
 
 export function ProductsSection() {
+  const [products, setProducts] = useState<Product[]>([])
+  const [productsLoading, setProductsLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [sortBy, setSortBy] = useState("relevance")
+
+  // Cargar productos desde Firestore
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        setProductsLoading(true)
+        const productsRef = collection(db, "products")
+        const productsQuery = query(productsRef, orderBy("name"))
+        const productsSnapshot = await getDocs(productsQuery)
+        
+        const productsData: Product[] = []
+        productsSnapshot.forEach((doc) => {
+          const data = doc.data()
+          // Solo incluir productos activos (isActive !== false)
+          if (data.isActive !== false) {
+            productsData.push({
+              id: doc.id,
+              name: data.name || "",
+              description: data.description || "",
+              price: typeof data.price === 'number' ? data.price : parseFloat(data.price) || 0,
+              image: data.image || "",
+              category: data.category || "rellenas",
+              isVeggie: data.isVeggie || false,
+              isGlutenFree: data.isGlutenFree || false,
+              isPromo: data.isPromo || false,
+              unitsPerPackage: data.unitsPerPackage ? Number(data.unitsPerPackage) : undefined,
+              servesPeople: data.servesPeople ? Number(data.servesPeople) : undefined,
+              variants: data.variants || [],
+            })
+          }
+        })
+        
+        setProducts(productsData)
+        console.log(`✅ Cargados ${productsData.length} productos activos`)
+      } catch (error) {
+        console.error("Error cargando productos:", error)
+        setProducts([])
+      } finally {
+        setProductsLoading(false)
+      }
+    }
+
+    loadProducts()
+  }, [])
 
   const categories = [
     { id: "all", label: "Todas" },
@@ -72,11 +80,27 @@ export function ProductsSection() {
     { id: "cintas", label: "Cintas" },
     { id: "placas", label: "Placas" },
     { id: "especiales", label: "Especiales" },
+    { id: "noqui", label: "Ñoqui" },
   ]
 
-  const filteredProducts = products.filter(
-    (product) => selectedCategory === "all" || product.category === selectedCategory,
-  )
+  // Filtrar y ordenar productos
+  const filteredProducts = products
+    .filter((product) => selectedCategory === "all" || product.category === selectedCategory)
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "price-low":
+          return a.price - b.price
+        case "price-high":
+          return b.price - a.price
+        case "bestseller":
+          // Por ahora, ordenar por nombre si no hay datos de ventas
+          return a.name.localeCompare(b.name)
+        case "relevance":
+        default:
+          // Mantener orden original (por nombre desde Firestore)
+          return 0
+      }
+    })
 
   return (
     <section id="catalogo" className="py-12 md:py-20">
@@ -126,11 +150,39 @@ export function ProductsSection() {
         </div>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.id} {...product} />
-          ))}
-        </div>
+        {productsLoading ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Cargando productos...</p>
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">
+              {selectedCategory === "all" 
+                ? "Aún no hay productos disponibles." 
+                : "No hay productos en esta categoría."}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredProducts.map((product) => (
+              <ProductCard 
+                key={product.id} 
+                id={product.id}
+                name={product.name}
+                description={product.description}
+                price={product.price}
+                image={product.image}
+                category={product.category}
+                isPromo={product.isPromo}
+                isVeggie={product.isVeggie}
+                isGlutenFree={product.isGlutenFree}
+                unitsPerPackage={product.unitsPerPackage}
+                servesPeople={product.servesPeople}
+                variants={product.variants}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   )
